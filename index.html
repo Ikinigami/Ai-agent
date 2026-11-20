@@ -1,0 +1,86 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nexus Studio</title>
+<style>
+:root{--bg:#0a0c16;--p:#131728;--p2:#1b2140;--t:#e8eaf6;--m:#8b93b8;--ac:#6d5efc;--ln:#262c50}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--t);font:15px system-ui,sans-serif;display:flex;height:100vh;overflow:hidden}
+.m{color:var(--m)}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#side{width:72px;background:var(--p);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:4px;border-right:1px solid var(--ln)}
+#side button{background:none;border:0;color:var(--m);width:62px;padding:10px 2px;border-radius:12px;font-size:11px;cursor:pointer}
+#side button b{display:block;font-size:21px;font-weight:400}
+#side button.on{background:var(--p2);color:#fff}
+main{flex:1;display:flex;flex-direction:column;min-width:0}
+header{padding:10px 14px;border-bottom:1px solid var(--ln);display:flex;gap:8px;align-items:center}
+#bar,.inp{background:var(--p);border:1px solid var(--ln);color:var(--t);padding:12px 14px;border-radius:12px;font-size:15px;min-width:0}
+#bar{flex:1}.inp{display:block;width:100%;max-width:460px;margin:8px 0}
+.go{background:var(--ac);color:#fff;border:0;padding:12px 16px;border-radius:12px;font-weight:600;cursor:pointer;font-size:15px}
+#bell{font-size:15px;min-width:42px;text-align:center}
+#chips{padding:8px 14px;display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--p);color:var(--m);border:1px solid var(--ln);padding:7px 12px;border-radius:20px;font-size:13px;cursor:pointer}
+.chip.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+#view{flex:1;overflow:auto;padding:14px}
+.floor{display:grid;grid-template:"a b c" 1fr "d e f" 1fr/1fr 1fr 1fr;gap:14px;background:linear-gradient(#1a2040,#101429);border:1px solid var(--ln);border-radius:18px;padding:22px;min-height:460px;transition:transform .4s}
+.floor.t3{transform:perspective(1500px) rotateX(14deg) scale(.96);transform-origin:50% 100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.s-IDLE{--c:#6b7280}.s-WORKING{--c:#3b82f6}.s-NEEDS-APPROVAL{--c:#f59e0b}.s-DONE{--c:#22c55e}.s-ERROR{--c:#ef4444}
+.st{background:var(--p2);border:2px solid var(--c);border-radius:14px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:5px;box-shadow:0 0 18px color-mix(in srgb,var(--c) 28%,transparent)}
+.st.dim{opacity:.22}.st:active{transform:scale(.98)}
+.av{font-size:34px}
+.pill{font-size:11px;font-weight:700;background:var(--c);color:#fff;padding:2px 9px;border-radius:10px;align-self:flex-start;display:inline-block}
+.s-WORKING .pill{animation:pu 1.2s infinite}@keyframes pu{50%{opacity:.45}}
+.note{color:var(--m);font-size:12.5px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.lounge{display:grid;place-items:center;color:var(--m);font-size:13px;text-align:center;border:2px dashed var(--ln);border-radius:14px}
+.ln{font-size:12.5px;color:var(--m);padding:3px 0;border-bottom:1px solid var(--ln)}
+#files a{display:block;color:#9fb0ff;padding:8px 0;border-bottom:1px solid var(--ln);word-break:break-all}
+#insp{position:fixed;right:0;top:0;bottom:0;width:min(400px,100%);background:var(--p);border-left:1px solid var(--ln);padding:16px;overflow:auto;z-index:5;box-shadow:-10px 0 30px #0008}
+#insp[hidden]{display:none}#insp textarea{width:100%;background:var(--p2);color:var(--t);border:1px solid var(--ln);border-radius:12px;padding:10px;font-size:15px;margin:10px 0}
+.x{float:right;background:none;border:0;color:var(--m);font-size:22px}
+pre{white-space:pre-wrap;background:var(--p2);padding:10px;border-radius:10px;font-size:12px;max-height:240px;overflow:auto}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ac);padding:10px 18px;border-radius:20px;opacity:0;transition:.3s;pointer-events:none}
+@media(max-width:700px){.floor{grid-template:"a b" "c d" "e f"/1fr 1fr}.floor .lounge{display:none}}
+</style></head><body>
+<nav id="side"></nav>
+<main>
+<header><input id="bar" placeholder="Tell the Manager what to do, or start with @scout @writer @editor @uploader"><button class="go" onclick="sendBar()">Send</button><span id="bell">🔔</span></header>
+<div id="chips"></div><div id="view"></div>
+</main>
+<aside id="insp" hidden></aside><div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s),J={'Content-Type':'application/json'};
+let st={agents:{},feed:[]},view='office',flt='ALL',sel=null,k=0;
+const POS={scout:'a',manager:'b',writer:'c',editor:'d',uploader:'f'};
+const NAV=[['command','⌘','Command'],['office','🏢','Office'],['team','👥','Team'],['studio','🎬','Studio'],['output','📁','Output']];
+const FLT=['ALL','IDLE','WORKING','NEEDS APPROVAL','DONE','ERROR'];
+const EX=['Research 3 trending topics about home workouts','Make a full short video about 3 study habits','@writer give me 5 hooks about learning to cook','@uploader prepare the upload package for my latest script'];
+const sc=s=>'s-'+s.replace(' ','-'),esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const station=(a,t)=>`<div class="st ${sc(a.status)} ${flt!='ALL'&&flt!=a.status?'dim':''}" ${t?'':`style="grid-area:${POS[a.id]}"`} onclick="open_('${a.id}')"><div class="av">${a.emoji}</div><b>${a.name}</b><small class="m">${t?a.desc:a.role}</small><span class="pill">${a.status}</span><div class="note">${esc(a.note)}</div></div>`;
+const V={
+command:()=>`<h2>Command</h2><p class="m">Type in the bar above. Tap an example to fill it in.</p><div class="row">${EX.map(e=>`<span class="chip" onclick="$('#bar').value=this.textContent;$('#bar').focus()">${e}</span>`).join('')}</div><h3>Live feed</h3><div id="feed"></div>`,
+office:()=>`<div id="map" class="floor t3"></div>`,
+team:()=>`<div id="team" class="grid"></div>`,
+studio:()=>`<h2>Studio</h2><p class="m">Research, script, voiceover, video and upload package in one tap. Add "in Tagalog" to the topic for a Filipino script.</p><input id="topic" class="inp" placeholder="Video topic"><select id="voice" class="inp"><option value="en-US-AndrewNeural">Andrew (US male)</option><option value="en-US-AriaNeural">Aria (US female)</option><option value="en-GB-RyanNeural">Ryan (UK male)</option><option value="fil-PH-AngeloNeural">Angelo (Filipino male)</option><option value="fil-PH-BlessicaNeural">Blessica (Filipino female)</option></select><label class="m"><input type="checkbox" id="appr" checked> Ask me to approve the script before rendering</label><p><button class="go" onclick="studioGo()">Make video</button></p><h3>Latest video</h3><video id="vid" controls playsinline style="max-width:260px;border-radius:12px"></video>`,
+output:()=>`<h2>Output files</h2><div id="files"></div>`};
+function show(v){view=v;$('#side').innerHTML=NAV.map(n=>`<button class="${n[0]==v?'on':''}" onclick="show('${n[0]}')"><b>${n[1]}</b>${n[2]}</button>`).join('');$('#view').innerHTML=V[v]();paint();loadFiles()}
+function paint(){
+const A=Object.values(st.agents),m=$('#map');
+if(m)m.innerHTML=A.map(a=>station(a)).join('')+`<div class="lounge" style="grid-area:e">☕ Break room<br>${st.feed.length} events logged</div>`;
+const f=$('#feed');if(f)f.innerHTML=st.feed.slice().reverse().map(x=>`<div class="ln">${esc(x)}</div>`).join('')||'<p class="m">No activity yet. Send the Manager a command.</p>';
+const t=$('#team');if(t)t.innerHTML=A.map(a=>station(a,1)).join('');
+const n=A.filter(a=>a.status=='NEEDS APPROVAL'||a.status=='ERROR').length;$('#bell').textContent='🔔'+(n?' '+n:'');
+if(sel)insp()}
+function open_(id){sel=id;const a=st.agents[id];$('#insp').hidden=false;$('#insp').innerHTML=`<button class="x" onclick="sel=null;$('#insp').hidden=true">✕</button><h2>${a.emoji} ${a.name}</h2><div id="iDyn"></div><textarea id="iTxt" rows="3" placeholder="Send a direct command to ${a.name}..."></textarea><button class="go" onclick="send($('#iTxt').value,'${id}');$('#iTxt').value=''">Send to ${a.name}</button>`;insp()}
+function insp(){const a=st.agents[sel];$('#iDyn').innerHTML=`<span class="pill ${sc(a.status)}">${a.status}</span><p class="m">${esc(a.role)}</p><p>${esc(a.note)}</p>${a.status=='NEEDS APPROVAL'?`<div class="row"><button class="go" onclick="appr(true)">✅ Approve</button><button class="chip" onclick="appr(false)">Reject</button></div><p class="m">Latest script is in the Writer panel.</p>`:''}<h4>Activity</h4>${a.log.slice().reverse().map(x=>`<div class="ln">${esc(x)}</div>`).join('')||'<p class="m">Nothing yet.</p>'}<h4>Latest output</h4><pre>${esc(a.last||'-')}</pre>`}
+async function send(text,agent,extra){if(!(text||'').trim())return;await fetch('/api/command',{method:'POST',headers:J,body:JSON.stringify({text,agent,...extra})});toast('Sent to the team');poll()}
+function sendBar(){send($('#bar').value);$('#bar').value=''}
+function studioGo(){const t=$('#topic').value.trim();if(!t)return toast('Enter a topic first');send('Full pipeline (scout, writer, editor, uploader) for a short vertical video about: '+t,null,{voice:$('#voice').value,approve:$('#appr').checked});show('office')}
+function appr(ok){fetch('/api/approve',{method:'POST',headers:J,body:JSON.stringify({ok})});toast(ok?'Approved':'Rejected');setTimeout(poll,400)}
+function toast(m){const t=$('#toast');t.textContent=m;t.style.opacity=1;setTimeout(()=>t.style.opacity=0,1800)}
+async function poll(){try{st=await(await fetch('/api/state')).json();paint()}catch(e){}}
+async function loadFiles(){try{const l=await(await fetch('/api/files')).json(),f=$('#files'),v=$('#vid'),mp=l.find(p=>p.endsWith('.mp4'));
+if(f)f.innerHTML=l.map(p=>`<a href="/files/${p}" target="_blank">${p}</a>`).join('')||'<p class="m">Nothing yet. Run a command first.</p>';
+if(v&&mp&&!v.src.endsWith(mp))v.src='/files/'+mp}catch(e){}}
+function chips(){$('#chips').innerHTML=FLT.map(f=>`<span class="chip ${f==flt?'on':''}" onclick="flt='${f}';chips();paint()">${f=='ALL'?'All':f.charAt(0)+f.slice(1).toLowerCase()}</span>`).join('')+`<span class="chip" onclick="$('#map')&&$('#map').classList.toggle('t3')">3D / 2D</span>`}
+$('#bar').onkeydown=e=>e.key=='Enter'&&sendBar();
+chips();show('office');poll();setInterval(()=>{poll();if(++k%4==0)loadFiles()},2000);
+</script></body></html>
